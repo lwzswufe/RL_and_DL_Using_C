@@ -4,9 +4,9 @@
 #include <math.h>
 
 #define SEED 65535      // 随机数SEED
-#define QUARTER_RAND_MAX ((RAND_MAX + 1) / 4)
+#define QUARTER_RAND_MAX ((RAND_MAX) / 4 + 1)
 #define HALF_RAND_MAX (RAND_MAX / 2)
-#define GENMAX 300      // 最大训练次数
+#define GENMAX 100      // 最大训练次数
 #define STATE_N 64      // 状态数
 #define REWARD  10      // 奖励
 #define GOAL    54      // 目标状态
@@ -34,6 +34,7 @@
 
 /*
 gcc q22dl.c -o q22dl.exe
+gcc q22dl.c -lm -o q22dl.o
 */
 struct Net
 {
@@ -42,6 +43,8 @@ struct Net
     double hi[HIDDENNO + 1];
     double o[OUTPUTNO];
     double filter[F_NO][F_SIZE][F_SIZE];
+    int path[LEVEL];
+    int step_n;
 };
 typedef struct Net Net; 
 
@@ -90,10 +93,17 @@ int main()
     for (int i=0; i<GENMAX; ++i)
     {
         s = 0;
-        for(t=0; t<LEVEL; ++t)
+        memset(net.path, -1, sizeof(int) * LEVEL);
+        net.step_n = 0;
+        if(i >= 50)
+        {
+            int a = 1;
+        }
+        for(; net.step_n<LEVEL; ++net.step_n)
         {   
             action = selecta(s, &net);
             s_next = step(s, action);
+            net.path[net.step_n] = s_next; 
             // 更新Q值
             set_e_by_s(s, net.filter, e);
             e[INPUTNO + action] = updateq(s, s_next, action, &net);
@@ -107,7 +117,7 @@ int main()
             if (s == GOAL)
                 break;
         }
-        printf(">>>>>>>>>>Iter%04d step:%04d<<<<<<<<<<\n", i, t);
+        printf(">>>>>>>>>>Iter%04d step:%04d<<<<<<<<<<\n", i, net.step_n);
         printqvalue(&net);
     }
     printf("run over\n");
@@ -117,7 +127,9 @@ int main()
 
 //>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>强化学习相关函数>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 double calcqvalue(Net* net, double e[INPUTNO], int s, int action)
-{
+{   
+    if (step(s, action) == GOAL)
+        return REWARD;
     switch(action)
     {   
         case UP:
@@ -187,17 +199,39 @@ int selecta(int s, Net* net)
     }
     return action;
 }
+// 获取下一步的最优Q值
+double get_q_next(int s, int a, Net* net)
+{
+    int best_action = -1;
+    double best_q = -RAND_MAX, q_arr[4];
+    double e[INPUTNO + OUTPUTNO] = {0};
+    int s_next = step(s, a);
+    // 如果s无法采取行动a
+    if (s == s_next)
+        return 0;
+    if (s == GOAL)
+        return REWARD;
+    set_e_by_s(s, net->filter, e);
+    for (int a_next=0; a_next<ACTION_N; a_next++)
+    {
+        double q = calcqvalue(net, e, s_next, a_next);
+        if (q > best_q)
+            best_q = q;
+    }
+    return best_q * GAMMA;
+}
 
 // 根据Q值表来选择行动
 int set_a_by_q(int s, Net* net)
 {
     int best_action = -1;
-    double best_q = -RAND_MAX, q_arr[4];
+    double best_q = -RAND_MAX, q_arr[4], q;
     double e[INPUTNO + OUTPUTNO] = {0};
     set_e_by_s(s, net->filter, e);
     for(int a=0; a<ACTION_N; a++)
     {   
-        double q = calcqvalue(net, e, s, a);
+        q = calcqvalue(net, e, s, a);
+        // q = get_q_next(s, a, net);
         q_arr[a] = q;
         if (q > best_q)
         {
@@ -213,7 +247,7 @@ int set_a_by_q(int s, Net* net)
     // printf("\n");
     int transfer[4] = {8, -8, -1, 1};
     int s_next = s + transfer[best_action];
-    if (s_next < 0 || s_next > 63)
+    if (s_next < 0 || s_next >= STATE_N)
     {
         int a = 1;
     }
@@ -223,9 +257,9 @@ int set_a_by_q(int s, Net* net)
 // 按照action前进一步
 int step(int s, int action)
 {   
-    int transfer[4] = {8, -8, -1, 1};
+    int transfer[4] = {-8, 8, -1, 1};
     int s_next = s + transfer[action];
-    if (s_next < 0 || s_next > 63)
+    if (s_next < 0 || s_next >= STATE_N)
     {
         return s;
     }
@@ -238,6 +272,7 @@ void printqvalue(Net* net)
 {   
     char action_str[5] = "UDLR";
     double e[INPUTNO + OUTPUTNO] = {0};
+    double q_value[STATE_N][ACTION_N];
     for (int s=0; s<STATE_N; ++s)
     {   
         if (s == GOAL)
@@ -251,6 +286,7 @@ void printqvalue(Net* net)
         for (int a=0; a<ACTION_N;++a)
         {   
             q = calcqvalue(net, e, s, a);
+            q_value[s][a] = q;
             if (q > best_q)
             {
                 best_action = a;
@@ -260,6 +296,12 @@ void printqvalue(Net* net)
         printf("%c ", action_str[best_action]);
         if (s % 8 == 7)
             printf("\n");
+    }
+    for (int s=0; s<STATE_N; ++s)
+    {
+        for( int a=0; a<ACTION_N; ++a)
+            printf("%.2lf ", q_value[s][a]);
+        printf("\n");
     }
 }
 
@@ -415,16 +457,17 @@ void pool(double convout[][IMAGESIZE], double poolout[][POOLOUTSIZE])
 {
     for( int i = 0; i < POOLOUTSIZE; ++i)
         for( int j = 0; j < POOLOUTSIZE; ++j)
-            convout[i][j] = calcpooling(convout, i * POOLSIZE, j * POOLSIZE);
+            poolout[i][j] = calcpooling(convout, i * POOLSIZE, j * POOLSIZE);
 }
 
 double calcpooling(double convout[][IMAGESIZE], int i, int j)
 {   // 平均池化
-    double sum = 0.0;
+    double sum = 0.0, mean = 0.0;
     for( int m = 0; m < POOLSIZE; ++m)
         for( int n = 0; n < POOLSIZE; ++n)
             sum += convout[i + m][j + n];
-    return sum / POOLSIZE / POOLSIZE;
+    mean = sum / POOLSIZE / POOLSIZE;
+    return mean;
 }
 
 void init_filter(double filter[F_NO][F_SIZE][F_SIZE])
@@ -443,6 +486,8 @@ void set_e_by_s(int s, double filter[F_NO][F_SIZE][F_SIZE], double e[INPUTNO + O
 
     // 卷积输入
     memset(image, 0, sizeof(double) * IMAGESIZE * IMAGESIZE);
+    memset(convout, 0, sizeof(double) * IMAGESIZE * IMAGESIZE);
+    memset(poolout, 0, sizeof(double) * POOLOUTSIZE * POOLOUTSIZE);
     image[s % IMAGESIZE][s / IMAGESIZE] = 1;
     // 生成全连接层输入数据
     for (int i = 0; i < F_NO; ++i)

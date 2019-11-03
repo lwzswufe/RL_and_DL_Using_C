@@ -51,7 +51,7 @@ void pool(double convout[][IMAGESIZE], double poolout[][POOLOUTSIZE])
 {
     for( int i = 0; i < POOLOUTSIZE; ++i)
         for( int j = 0; j < POOLOUTSIZE; ++j)
-            convout[i][j] = calcpooling(convout, i * POOLSIZE, j * POOLSIZE);
+            poolout[i][j] = calcpooling(convout, i * POOLSIZE, j * POOLSIZE);
 }
 
 double calcpooling(double convout[][IMAGESIZE], int i, int j)
