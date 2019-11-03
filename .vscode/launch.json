@@ -59,7 +59,7 @@
             "stopAtEntry": false,
             "cwd": "${fileDirname}",
             "environment": [],
-            "externalConsole": true,
+            "externalConsole": false,
             "MIMode": "gdb",
             "miDebuggerPath": "C:\\LLVM\\bin\\gdb.exe",
             "setupCommands": [

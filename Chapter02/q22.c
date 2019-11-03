@@ -134,6 +134,11 @@ void printqvalue(double qvalue[STATE_N][ACTION_N])
     char action_str[5] = "UDLR";
     for (int i=0; i<STATE_N; ++i)
     {   
+        if (i == GOAL)
+        {
+            printf("# ");
+            continue;
+        }
         double best_q = -RAND_MAX;
         int best_action = 0;
         for (int j=0; j<ACTION_N;++j)

@@ -167,7 +167,7 @@ void olearn(double wo[OUTPUTNO][HIDDENNO + 1], double hi[HIDDENNO + 1], double e
             wo[i][j] += ALPHA * d * hi[j];
         }
         // beta项的学习
-        wo[i][INPUTNO] += ALPHA * d * (-1.0);
+        wo[i][HIDDENNO] += ALPHA * d * (-1.0);
     }
 }
 
